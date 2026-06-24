@@ -1,0 +1,186 @@
+name: Terraform CI (DevSecOps)
+
+# Pipeline déclenché sur chaque Pull Request ciblant `main`.
+# Étapes : Linting -> Sécurité (Shift-Left) -> Plan -> commentaire dans la PR.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - "modules/**"
+      - ".github/workflows/terraform-ci.yml"
+      - ".tflint.hcl"
+      - ".trivyignore"
+
+# Annule les exécutions précédentes sur la même PR.
+concurrency:
+  group: terraform-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+env:
+  TF_VERSION: "1.9.8"
+  WORKING_DIR: "infra"
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Étape 1 : Linting (terraform fmt + tflint)
+  # ---------------------------------------------------------------------
+  lint:
+    name: Étape 1 · Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: terraform fmt (vérification du formatage)
+        run: terraform fmt -recursive -check -diff
+
+      - name: terraform init (sans backend)
+        run: terraform -chdir=${{ env.WORKING_DIR }} init -backend=false -input=false
+
+      - name: terraform validate
+        run: terraform -chdir=${{ env.WORKING_DIR }} validate -no-color
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: TFLint init
+        run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: TFLint (analyse récursive)
+        run: tflint --recursive --no-color
+
+  # ---------------------------------------------------------------------
+  # Étape 2 : Sécurité (analyse statique Trivy — bloque si faille HIGH/CRITICAL)
+  # ---------------------------------------------------------------------
+  security:
+    name: Étape 2 · Sécurité (Trivy)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trivy — génération du rapport SARIF
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: "0"
+          trivyignores: .trivyignore
+
+      - name: Upload SARIF vers GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-iac
+
+      - name: Trivy — porte de sécurité (échec si HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          trivyignores: .trivyignore
+
+  # ---------------------------------------------------------------------
+  # Étape 3 : Plan + publication du résultat dans la Pull Request
+  # ---------------------------------------------------------------------
+  plan:
+    name: Étape 3 · Plan
+    runs-on: ubuntu-latest
+    needs: security
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: terraform init (sans backend)
+        id: init
+        run: terraform -chdir=${{ env.WORKING_DIR }} init -backend=false -input=false
+
+      - name: terraform plan
+        id: plan
+        run: |
+          terraform -chdir=${{ env.WORKING_DIR }} plan -no-color -input=false \
+            -var ci_mode=true -out=tfplan.binary
+        continue-on-error: true
+
+      - name: Publier le plan dans la PR
+        uses: actions/github-script@v7
+        env:
+          PLAN_STDOUT: "${{ steps.plan.outputs.stdout }}"
+          PLAN_OUTCOME: "${{ steps.plan.outcome }}"
+        with:
+          script: |
+            const plan = (process.env.PLAN_STDOUT || '').substring(0, 60000);
+            const outcome = process.env.PLAN_OUTCOME;
+            const icon = outcome === 'success' ? '✅' : '❌';
+            const body = `### ${icon} Terraform Plan — \`${outcome}\`
+
+            <details><summary>Afficher le plan</summary>
+
+            \`\`\`hcl
+            ${plan}
+            \`\`\`
+
+            </details>
+
+            | Étape | Statut |
+            | --- | --- |
+            | 🧹 Linting (fmt + tflint) | ✅ |
+            | 🛡️ Sécurité (Trivy) | ✅ |
+            | 📋 Plan | ${icon} |
+
+            *Pipeline : \`${context.workflow}\` · Commit : \`${context.sha.substring(0,7)}\`*`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Terraform Plan'));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Échec si le plan a échoué
+        if: steps.plan.outcome == 'failure'
+        run: exit 1

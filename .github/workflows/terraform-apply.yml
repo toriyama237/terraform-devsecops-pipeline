@@ -1,0 +1,61 @@
+name: Terraform Apply (Validation humaine)
+
+# Étape 4 : déploiement réel, déclenché après merge sur `main` ou manuellement.
+# Le job `apply` cible l'environnement protégé `production` : GitHub exige
+# l'approbation d'un administrateur (required reviewer) AVANT le terraform apply.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - "modules/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # nécessaire pour l'authentification AWS via OIDC
+
+concurrency:
+  group: terraform-apply
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: "1.9.8"
+  WORKING_DIR: "infra"
+  AWS_REGION: "eu-west-3"
+
+jobs:
+  apply:
+    name: Étape 4 · Apply (après approbation)
+    runs-on: ubuntu-latest
+
+    # ⛔️ Porte de validation humaine : configurez des "Required reviewers"
+    # sur cet environnement dans Settings > Environments > production.
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      # Authentification AWS via OIDC (aucun secret long-terme stocké).
+      # Décommentez et renseignez le rôle après avoir configuré l'IAM OIDC.
+      # - name: Configure AWS credentials (OIDC)
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+      #     aws-region: ${{ env.AWS_REGION }}
+
+      - name: terraform init
+        run: terraform -chdir=${{ env.WORKING_DIR }} init -input=false
+
+      - name: terraform apply
+        run: |
+          terraform -chdir=${{ env.WORKING_DIR }} apply \
+            -auto-approve -input=false \
+            -var "account_id=${{ secrets.AWS_ACCOUNT_ID }}"

@@ -1,0 +1,7 @@
+project_name = "terraform-devsecops"
+environment  = "production"
+aws_region   = "eu-west-3"
+vpc_cidr     = "10.0.0.0/16"
+
+# Restreignez l'accès administrateur à vos plages d'IP. Jamais 0.0.0.0/0.
+admin_cidrs = ["10.0.0.0/16"]

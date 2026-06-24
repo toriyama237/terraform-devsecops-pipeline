@@ -1,0 +1,19 @@
+# Exceptions de sécurité documentées et justifiées (Shift-Left Security).
+# Chaque ligne DOIT être motivée. Aucune exception ne contourne une faille réelle.
+
+# AVD-AWS-0088 : le bucket S3 est chiffré via SSE-KMS (clé gérée AWS). L'usage
+# d'une CMK dédiée par bucket est volontairement hors périmètre de cette démo
+# afin d'éviter une multiplication de clés KMS facturées.
+AVD-AWS-0088
+
+# AVD-AWS-0132 : idem, chiffrement S3 assuré par clé KMS gérée AWS.
+AVD-AWS-0132
+
+# AVD-AWS-0089 : logging d'accès S3 non activé pour éviter de créer un second
+# bucket de logs (récursion) dans cette démo. À activer en production réelle.
+AVD-AWS-0089
+
+# AVD-AWS-0104 : la règle d'egress autorise la sortie HTTPS (443) vers Internet.
+# C'est volontaire et nécessaire pour que les instances atteignent les API AWS
+# et les mises à jour. L'ingress, lui, reste strictement restreint.
+AVD-AWS-0104
