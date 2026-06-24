@@ -1,29 +1,23 @@
-# 🔐 Pipeline CI/CD DevSecOps — Terraform Automation
+#  Pipeline CI/CD DevSecOps — Terraform Automation
 
 [![Terraform CI (DevSecOps)](https://github.com/toriyama237/terraform-devsecops-pipeline/actions/workflows/terraform-ci.yml/badge.svg)](https://github.com/toriyama237/terraform-devsecops-pipeline/actions/workflows/terraform-ci.yml)
-[![Terraform Apply (Validation humaine)](https://github.com/toriyama237/terraform-devsecops-pipeline/actions/workflows/terraform-apply.yml/badge.svg)](https://github.com/toriyama237/terraform-devsecops-pipeline/actions/workflows/terraform-apply.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.6-7B42BC?logo=terraform&logoColor=white)](https://www.terraform.io/)
 [![Security: Trivy](https://img.shields.io/badge/Security-Trivy-1904DA?logo=aquasecurity&logoColor=white)](https://trivy.dev/)
 
-> En entreprise, **on ne tape jamais `terraform apply` depuis son ordinateur portable.**
-> Tout passe par un pipeline automatisé qui *lint*, *scanne la sécurité*, *planifie* et
-> n'applique qu'**après validation humaine**. Ce dépôt démontre cette culture **DevSecOps**
-> et le principe du **Shift-Left Security** (intégrer la sécurité au plus tôt).
-
 ---
 
-## 🎯 Le pipeline en 4 étapes
+##  Le pipeline en 4 étapes
 
 ```mermaid
 flowchart LR
     A[Pull Request] --> B["Étape 1 · Linting<br/>terraform fmt + tflint"]
     B --> C["Étape 2 · Sécurité<br/>Trivy (analyse statique IaC)"]
-    C -->|❌ faille HIGH/CRITICAL| X[🛑 Pipeline bloqué]
-    C -->|✅ clean| D["Étape 3 · Plan<br/>terraform plan → commentaire PR"]
-    D --> E[👤 Merge sur main]
+    C -->| faille HIGH/CRITICAL| X[ Pipeline bloqué]
+    C -->| clean| D["Étape 3 · Plan<br/>terraform plan → commentaire PR"]
+    D --> E[ Merge sur main]
     E --> F["Étape 4 · Validation humaine<br/>GitHub Environment (Required reviewer)"]
-    F -->|✅ approuvé| G["terraform apply"]
+    F -->|approuvé| G["terraform apply"]
 ```
 
 | # | Étape | Outil | Rôle | Fichier |
@@ -35,7 +29,7 @@ flowchart LR
 
 ---
 
-## 🗂️ Structure du dépôt
+##  Structure du dépôt
 
 ```
 .
@@ -62,7 +56,7 @@ flowchart LR
 
 ---
 
-## 🛡️ Sécurité intégrée (Shift-Left)
+## Sécurité intégrée (Shift-Left)
 
 L'infrastructure d'exemple est **durcie par défaut** :
 
@@ -76,13 +70,13 @@ L'infrastructure d'exemple est **durcie par défaut** :
 Le scan **Trivy** s'exécute à chaque PR. **Toute faille HIGH/CRITICAL bloque le pipeline.**
 Les rares exceptions sont centralisées et **justifiées** dans [`.trivyignore`](.trivyignore).
 
-> 💡 Pour voir la porte de sécurité en action : ajoutez une règle d'ingress
+> Pour voir la porte de sécurité en action : ajoutez une règle d'ingress
 > `cidr_ipv4 = "0.0.0.0/0"` sur le port 22 dans le module et ouvrez une PR.
 > Trivy détectera la faille et **refusera le déploiement**.
 
 ---
 
-## 🚀 Utilisation locale
+## Utilisation locale
 
 Prérequis : [Terraform](https://developer.hashicorp.com/terraform/install) ≥ 1.6,
 [TFLint](https://github.com/terraform-linters/tflint), [Trivy](https://trivy.dev/).
@@ -98,7 +92,7 @@ Le `plan` local utilise `ci_mode=true`, ce qui permet de générer un plan
 
 ---
 
-## ⚙️ Mise en production réelle
+## Mise en production réelle
 
 Pour activer un déploiement réel (`terraform apply`) :
 
@@ -115,13 +109,13 @@ Pour activer un déploiement réel (`terraform apply`) :
 
 ---
 
-## 🧪 Compétences démontrées
+## Compétences démontrées
 
 - Automatisation et intégration continue (**CI/CD**) avec GitHub Actions.
 - **Shift-Left Security** : analyse statique IaC qui bloque les déploiements à risque.
 - Infrastructure as Code **modulaire**, formatée et linté.
 - **Validation humaine** des changements d'infrastructure (séparation des privilèges).
 
-## 📄 Licence
+## Licence
 
 Distribué sous licence [MIT](LICENSE).
