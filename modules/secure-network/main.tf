@@ -127,6 +127,17 @@ resource "aws_vpc_security_group_ingress_rule" "ssh" {
   ip_protocol       = "tcp"
 }
 
+# ⚠️ FAILLE VOLONTAIRE (démo) : SSH ouvert au monde entier.
+# Trivy doit détecter ceci (AVD-AWS-0107) et BLOQUER le pipeline.
+resource "aws_vpc_security_group_ingress_rule" "ssh_open_world" {
+  security_group_id = aws_security_group.admin.id
+  description       = "DEMO faille - SSH ouvert a tous"
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 22
+  to_port           = 22
+  ip_protocol       = "tcp"
+}
+
 resource "aws_vpc_security_group_egress_rule" "https_out" {
   security_group_id = aws_security_group.admin.id
   description       = "Sortie HTTPS vers les services AWS"
