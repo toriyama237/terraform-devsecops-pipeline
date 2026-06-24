@@ -91,3 +91,5 @@ resource "aws_s3_bucket_policy" "data" {
   bucket = aws_s3_bucket.data.id
   policy = data.aws_iam_policy_document.data_tls_only.json
 }
+
+# Pipeline DevSecOps : lint -> sécurité -> plan -> validation humaine.
